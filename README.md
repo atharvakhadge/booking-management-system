@@ -98,8 +98,8 @@ If you want the test database to live somewhere else (e.g. a separate Atlas clus
 - ✅ Phase 1 — Frontend
 - ✅ Phase 2 — Backend + database
 - ✅ Phase 3 — Testing
-- ⬜ Phase 4 — GitHub repository (in progress — see below)
-- ⬜ Phase 5 — Jenkins pipeline
+- ✅ Phase 4 — GitHub repository
+- ✅ Phase 5 — Jenkins pipeline
 - ⬜ Phase 6 — Docker
 - ⬜ Phase 7 — Deployment
 - ⬜ Phase 8 — Ansible automation
