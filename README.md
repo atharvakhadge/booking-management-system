@@ -34,10 +34,30 @@ booking-management-system/
 │   ├── package.json
 │   └── .env.example
 │
+├── Dockerfile            Builds the backend + serves the frontend as static files
+├── docker-compose.yml    Runs the app together with its own MongoDB container
+├── .dockerignore
+├── Jenkinsfile
 └── README.md
 ```
 
-## Running it locally
+## Running it with Docker
+
+This is the easiest way to run the whole stack — no local Node.js or MongoDB installation required, since both live inside containers.
+
+1. Install **Docker Desktop** (docker.com/products/docker-desktop), which on Windows also needs WSL2 — the installer prompts you through that if it's missing.
+2. From the project root:
+   ```bash
+   docker compose up --build
+   ```
+   First run downloads the `mongo:7` image and builds the app image, so it takes a few minutes. Subsequent runs are much faster.
+3. Open **http://localhost:5000** — same app, running entirely in containers.
+
+This spins up a **separate, empty MongoDB** inside its own container (data lives in a Docker volume, isolated from any MongoDB you have installed directly on Windows), so it seeds fresh sample movies and a fresh admin account (`admin` / `admin123`) the first time it starts, same as a brand new install. The admin credentials and JWT secret for this containerized version are set directly in `docker-compose.yml` — edit them there before running this anywhere but your own machine.
+
+To stop everything: `docker compose down` (add `-v` if you also want to wipe the database volume and start clean next time).
+
+## Running it locally (without Docker)
 
 1. **Start MongoDB** — either run `mongod` locally, or use a free MongoDB Atlas cluster.
 2. **Configure the backend**
@@ -93,6 +113,12 @@ This covers:
 
 If you want the test database to live somewhere else (e.g. a separate Atlas cluster), set `MONGO_URI_TEST` before running `npm test`.
 
+## Jenkins and Docker together
+
+The `Jenkinsfile` now has a `Build Docker Image` stage after the tests pass, so a green pipeline ends with a `booking-management-system` image sitting in Docker's local image cache on whatever machine runs the build.
+
+One thing worth knowing if you're running Jenkins natively on Windows (as installed in Phase 5): Jenkins runs as a Windows **service**, under the `LocalSystem` account, while Docker Desktop's engine is normally only reachable from your own logged-in user session. This can mean the `Build Docker Image` stage fails with something like `error during connect` even though `docker build` works fine when you run it yourself in PowerShell — that's not a mistake in the Jenkinsfile, it's a real, well-known friction point with Windows + Jenkins-as-a-service + Docker Desktop specifically. It's not something to lose time debugging for this assignment: in a real deployment, Jenkins would typically run on a Linux server (exactly what Phase 7's EC2/VM step sets up) where this isn't an issue at all, since Jenkins and Docker run under the same straightforward permission model. For now, running `docker compose up --build` yourself to demonstrate the container working is the right proof point — mention the Windows/service permission nuance if it comes up in your viva, it's a legitimate real-world detail, not a gap in your work.
+
 ## Status
 
 - ✅ Phase 1 — Frontend
@@ -100,7 +126,7 @@ If you want the test database to live somewhere else (e.g. a separate Atlas clus
 - ✅ Phase 3 — Testing
 - ✅ Phase 4 — GitHub repository
 - ✅ Phase 5 — Jenkins pipeline
-- ⬜ Phase 6 — Docker
+- ✅ Phase 6 — Docker
 - ⬜ Phase 7 — Deployment
 - ⬜ Phase 8 — Ansible automation
 - ⬜ Phase 9 — Monitoring

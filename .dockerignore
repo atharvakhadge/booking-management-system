@@ -1,0 +1,11 @@
+.git
+.gitignore
+*.md
+
+node_modules
+backend/node_modules
+backend/.env
+backend/tests
+
+npm-debug.log*
+*.log

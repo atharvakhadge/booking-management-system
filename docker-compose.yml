@@ -1,0 +1,34 @@
+services:
+  mongo:
+    image: mongo:7
+    container_name: booking-mongo
+    restart: unless-stopped
+    # Mapped to 27018 on the host (not 27017) so this doesn't clash with a
+    # MongoDB you may already have installed locally on your machine. The
+    # app talks to this container over the internal Docker network using
+    # the service name "mongo", not this port — the mapping is only here
+    # so you can optionally connect a GUI tool (e.g. MongoDB Compass) to
+    # peek inside it from your host machine.
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongo-data:/data/db
+
+  app:
+    build: .
+    container_name: booking-app
+    restart: unless-stopped
+    depends_on:
+      - mongo
+    ports:
+      - "5000:5000"
+    environment:
+      MONGO_URI: mongodb://mongo:27017/booking_management
+      PORT: 5000
+      # Change these before running this anywhere other than your own machine.
+      ADMIN_USERNAME: admin
+      ADMIN_PASSWORD: admin123
+      JWT_SECRET: change-this-secret-in-any-real-deployment
+
+volumes:
+  mongo-data:

@@ -44,7 +44,19 @@ pipeline {
             }
         }
 
-        // Docker build/push and deployment stages get added here in Phase 6/7.
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    if (isUnix()) {
+                        sh "docker build -t booking-management-system:latest -t booking-management-system:${env.BUILD_NUMBER} ."
+                    } else {
+                        bat "docker build -t booking-management-system:latest -t booking-management-system:${env.BUILD_NUMBER} ."
+                    }
+                }
+            }
+        }
+
+        // Pushing the image to Docker Hub and deploying it get added here in Phase 7.
     }
 
     post {
