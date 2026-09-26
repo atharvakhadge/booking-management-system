@@ -113,6 +113,17 @@ This covers:
 
 If you want the test database to live somewhere else (e.g. a separate Atlas cluster), set `MONGO_URI_TEST` before running `npm test`.
 
+## Deployment
+
+The app is deployed to a real AWS EC2 instance (Ubuntu, `t3.micro`, free tier, `ap-south-1` / Mumbai region). What's running there right now, done manually:
+
+1. Launched the EC2 instance with a security group allowing SSH (port 22, restricted to a specific IP) and the app itself (port 5000, open to everyone).
+2. Installed Docker + the Compose plugin on the instance using Docker's official install script.
+3. Cloned this repository directly onto the instance.
+4. Ran `docker compose up --build -d` — same `docker-compose.yml` used locally, no changes needed, because the whole point of containerizing in Phase 6 was that it runs identically anywhere.
+
+This manual process is exactly what Phase 8 (Ansible) automates — instead of SSHing in and typing these commands by hand, an Ansible playbook does steps 2–4 on its own.
+
 ## Jenkins and Docker together
 
 The `Jenkinsfile` now has a `Build Docker Image` stage after the tests pass, so a green pipeline ends with a `booking-management-system` image sitting in Docker's local image cache on whatever machine runs the build.
@@ -127,7 +138,7 @@ One thing worth knowing if you're running Jenkins natively on Windows (as instal
 - ✅ Phase 4 — GitHub repository
 - ✅ Phase 5 — Jenkins pipeline
 - ✅ Phase 6 — Docker
-- ⬜ Phase 7 — Deployment
+- ✅ Phase 7 — Deployment
 - ⬜ Phase 8 — Ansible automation
 - ⬜ Phase 9 — Monitoring
 - ⬜ Phase 10 — Final report + methodology diagram + viva prep
