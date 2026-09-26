@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reel &amp; Row — Admin</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar__mark">REEL <span>&amp; ROW</span></div>
+  <nav class="topbar__nav">
+    <a href="index.html">Now showing</a>
+    <a href="bookings.html">Admin</a>
+  </nav>
+</header>
+
+<main class="page">
+  <section class="hero" style="display:flex; align-items:flex-end; justify-content:space-between; gap:20px;">
+    <div>
+      <h1>Admin</h1>
+      <p>Manage what's playing and see every ticket that's been booked.</p>
+    </div>
+    <button class="icon-btn" id="logoutBtn" style="color:var(--text-muted); white-space:nowrap;">Log out</button>
+  </section>
+
+  <div class="admin-grid">
+    <div class="admin-card">
+      <h2>Add a movie</h2>
+      <input class="text-input" id="newTitle" type="text" placeholder="Title">
+      <input class="text-input" id="newGenre" type="text" placeholder="Genre">
+      <div class="two-col" style="margin-bottom:12px;">
+        <input class="text-input" id="newDuration" type="number" min="1" placeholder="Duration (min)">
+        <input class="text-input" id="newRating" type="text" placeholder="Rating, e.g. UA">
+      </div>
+      <input class="text-input" id="newShowtimes" type="text" placeholder="Showtimes, comma separated (e.g. 2:00 PM, 6:00 PM)">
+      <button class="btn-primary" id="addMovieBtn">Add movie</button>
+      <p class="form-error" id="addError">Please fill in a title, genre, duration and at least one showtime.</p>
+
+      <div style="margin-top:26px;">
+        <h2>Now showing</h2>
+        <div id="movieList"><p style="color:var(--text-muted);font-size:13px;">Loading…</p></div>
+      </div>
+    </div>
+
+    <div class="admin-card">
+      <h2>All bookings</h2>
+      <div id="bookingsWrap"><p style="color:var(--text-muted);font-size:13px;">Loading…</p></div>
+    </div>
+  </div>
+</main>
+
+<script src="script.js"></script>
+<script>
+  requireAdminSession();
+
+  document.getElementById('logoutBtn').addEventListener('click', () => {
+    clearToken();
+    window.location.href = 'login.html';
+  });
+
+  async function renderMovieList() {
+    const list = document.getElementById('movieList');
+    let movies;
+    try {
+      movies = await api.getMovies();
+    } catch (err) {
+      list.innerHTML = `<p style="color:var(--danger);font-size:13px;">Couldn't load movies.</p>`;
+      return;
+    }
+    if (movies.length === 0) {
+      list.innerHTML = `<p style="color:var(--text-muted);font-size:13px;">No movies added yet.</p>`;
+      return;
+    }
+    list.innerHTML = movies.map(m => `
+      <div class="movie-list-row">
+        <div>
+          <div class="movie-list-row__name">${m.title}</div>
+          <div class="movie-list-row__meta">${m.genre} · ${m.duration} min · ${m.rating}</div>
+        </div>
+        <button class="icon-btn" data-delete="${m._id}">Delete</button>
+      </div>
+    `).join('');
+  }
+
+  async function renderBookings() {
+    const wrap = document.getElementById('bookingsWrap');
+    let bookings;
+    try {
+      bookings = await api.getBookings();
+    } catch (err) {
+      wrap.innerHTML = `<p style="color:var(--danger);font-size:13px;">Couldn't load bookings.</p>`;
+      return;
+    }
+    if (bookings.length === 0) {
+      wrap.innerHTML = `<div class="empty-state">No bookings yet.</div>`;
+      return;
+    }
+    wrap.innerHTML = `
+      <div style="overflow-x:auto;">
+        <table class="bookings-table">
+          <thead>
+            <tr>
+              <th>Booking ID</th><th>Movie</th><th>Date</th><th>Time</th><th>Seats</th><th>Name</th><th>Contact</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${bookings.map(b => `
+              <tr>
+                <td>${b.bookingId}</td>
+                <td>${b.movieTitle}</td>
+                <td>${b.date}</td>
+                <td>${b.time}</td>
+                <td>${b.seats.join(', ')}</td>
+                <td>${b.name}</td>
+                <td>${b.contact}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  document.getElementById('addMovieBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('addMovieBtn');
+    const title = document.getElementById('newTitle').value.trim();
+    const genre = document.getElementById('newGenre').value.trim();
+    const duration = Number(document.getElementById('newDuration').value) || 0;
+    const rating = document.getElementById('newRating').value.trim() || 'UA';
+    const showtimes = document.getElementById('newShowtimes').value
+      .split(',').map(s => s.trim()).filter(Boolean);
+    const errorEl = document.getElementById('addError');
+
+    if (!title || !genre || !duration || showtimes.length === 0) {
+      errorEl.classList.add('is-visible');
+      return;
+    }
+    errorEl.classList.remove('is-visible');
+    btn.disabled = true;
+    btn.textContent = 'Adding…';
+
+    try {
+      await api.addMovie({ title, genre, duration, rating, showtimes });
+      ['newTitle', 'newGenre', 'newDuration', 'newRating', 'newShowtimes'].forEach(id => {
+        document.getElementById(id).value = '';
+      });
+      await renderMovieList();
+    } catch (err) {
+      errorEl.textContent = err.message || 'Failed to add movie.';
+      errorEl.classList.add('is-visible');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Add movie';
+    }
+  });
+
+  document.getElementById('movieList').addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-delete]');
+    if (!btn) return;
+    btn.disabled = true;
+    btn.textContent = '…';
+    try {
+      await api.deleteMovie(btn.dataset.delete);
+      await renderMovieList();
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = 'Delete';
+    }
+  });
+
+  renderMovieList();
+  renderBookings();
+</script>
+</body>
+</html>

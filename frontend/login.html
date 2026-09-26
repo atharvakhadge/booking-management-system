@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reel &amp; Row — Admin Login</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar__mark">REEL <span>&amp; ROW</span></div>
+  <nav class="topbar__nav">
+    <a href="index.html">Now showing</a>
+  </nav>
+</header>
+
+<main class="page page--narrow">
+  <section class="hero">
+    <h1>Admin login</h1>
+    <p>Sign in to manage movies and view bookings.</p>
+  </section>
+
+  <div class="admin-card" style="max-width:380px;">
+    <div class="two-col" style="grid-template-columns: 1fr; margin-bottom:0;">
+      <input class="text-input" id="username" type="text" placeholder="Username" autocomplete="username">
+      <input class="text-input" id="password" type="password" placeholder="Password" autocomplete="current-password">
+    </div>
+    <button class="btn-primary" id="loginBtn" style="margin-top:14px;">Log in</button>
+    <p class="form-error" id="loginError">Invalid username or password.</p>
+  </div>
+</main>
+
+<script src="script.js"></script>
+<script>
+  // Already logged in? Skip straight past the login screen.
+  if (isLoggedIn()) {
+    window.location.href = qs('redirect') || 'bookings.html';
+  }
+
+  const btn = document.getElementById('loginBtn');
+  const errorEl = document.getElementById('loginError');
+
+  async function attemptLogin() {
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value;
+
+    if (!username || !password) {
+      errorEl.textContent = 'Please enter both a username and password.';
+      errorEl.classList.add('is-visible');
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Logging in…';
+    errorEl.classList.remove('is-visible');
+
+    try {
+      const result = await api.login(username, password);
+      setToken(result.token);
+      window.location.href = qs('redirect') || 'bookings.html';
+    } catch (err) {
+      errorEl.textContent = err.message || 'Invalid username or password.';
+      errorEl.classList.add('is-visible');
+      btn.disabled = false;
+      btn.textContent = 'Log in';
+    }
+  }
+
+  btn.addEventListener('click', attemptLogin);
+  document.getElementById('password').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') attemptLogin();
+  });
+</script>
+</body>
+</html>

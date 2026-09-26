@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reel &amp; Row — Book Tickets</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar__mark">REEL <span>&amp; ROW</span></div>
+  <nav class="topbar__nav">
+    <a href="index.html">Now showing</a>
+    <a href="bookings.html">Admin</a>
+  </nav>
+</header>
+
+<main class="page page--narrow" id="app">
+  <p style="color:var(--text-muted);">Loading…</p>
+</main>
+
+<script src="script.js"></script>
+<script>
+  const app = document.getElementById('app');
+  const SEAT_ROWS = ['A', 'B', 'C', 'D', 'E'];
+  const SEATS_PER_ROW = 10;
+
+  let movie = null;
+  let selectedDate = null;
+  let selectedTime = null;
+  let selectedSeats = [];
+  let takenSeats = new Set();
+
+  init();
+
+  async function init() {
+    const movieId = qs('movie');
+    if (!movieId) return showNotFound();
+    try {
+      movie = await api.getMovie(movieId);
+    } catch (err) {
+      return showNotFound();
+    }
+    renderBookingForm();
+  }
+
+  function showNotFound() {
+    app.innerHTML = `
+      <div class="empty-state">
+        We couldn't find that movie.<br>
+        <a class="back-link" href="index.html">← Back to now showing</a>
+      </div>`;
+  }
+
+  function seatLabel(row, col) {
+    return `${row}${col + 1}`;
+  }
+
+  function renderBookingForm() {
+    const days = nextDays(7);
+    selectedDate = days[0].value;
+    selectedTime = movie.showtimes[0];
+    selectedSeats = [];
+
+    app.innerHTML = `
+      <div class="booking-header">
+        <div class="booking-header__poster" style="${posterVars(movie.hue)}"></div>
+        <div>
+          <h1 class="booking-header__title">${movie.title}</h1>
+          <p class="booking-header__meta">${movie.genre} · ${movie.duration} min · ${movie.rating}</p>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <span class="field-group__label">Date</span>
+        <div class="pill-row" id="dateRow">
+          ${days.map((d, i) => `<button type="button" class="pill${i === 0 ? ' is-selected' : ''}" data-date="${d.value}">${d.label}</button>`).join('')}
+        </div>
+      </div>
+
+      <div class="field-group">
+        <span class="field-group__label">Showtime</span>
+        <div class="pill-row" id="timeRow">
+          ${movie.showtimes.map((t, i) => `<button type="button" class="pill${i === 0 ? ' is-selected' : ''}" data-time="${t}">${t}</button>`).join('')}
+        </div>
+      </div>
+
+      <div class="field-group">
+        <span class="field-group__label">Select your seats</span>
+        <div class="screen-arc"></div>
+        <p class="screen-label">SCREEN</p>
+        <div class="seat-map" id="seatMap"><p style="color:var(--text-muted);font-size:13px;">Loading seat map…</p></div>
+        <div class="seat-legend">
+          <span><span class="seat-legend__swatch" style="background: var(--surface-alt);"></span>Available</span>
+          <span><span class="seat-legend__swatch" style="background: var(--accent);"></span>Selected</span>
+          <span><span class="seat-legend__swatch" style="background: var(--line);"></span>Taken</span>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <span class="field-group__label">Your details</span>
+        <div class="two-col">
+          <input class="text-input" id="custName" type="text" placeholder="Full name">
+          <input class="text-input" id="custEmail" type="email" placeholder="Email or phone">
+        </div>
+      </div>
+
+      <div class="booking-summary">
+        <span>0 seat(s) selected</span>
+        <strong id="totalSeatsLabel">—</strong>
+      </div>
+
+      <button class="btn-primary" id="confirmBtn" disabled>Select at least one seat</button>
+      <p class="form-error" id="formError"></p>
+    `;
+
+    document.getElementById('dateRow').addEventListener('click', (e) => {
+      const btn = e.target.closest('.pill');
+      if (!btn) return;
+      selectedDate = btn.dataset.date;
+      [...btn.parentElement.children].forEach((c) => c.classList.remove('is-selected'));
+      btn.classList.add('is-selected');
+      selectedSeats = [];
+      loadSeatMap();
+    });
+
+    document.getElementById('timeRow').addEventListener('click', (e) => {
+      const btn = e.target.closest('.pill');
+      if (!btn) return;
+      selectedTime = btn.dataset.time;
+      [...btn.parentElement.children].forEach((c) => c.classList.remove('is-selected'));
+      btn.classList.add('is-selected');
+      selectedSeats = [];
+      loadSeatMap();
+    });
+
+    document.getElementById('confirmBtn').addEventListener('click', handleConfirm);
+    document.getElementById('seatMap').addEventListener('click', handleSeatClick);
+
+    loadSeatMap();
+  }
+
+  async function loadSeatMap() {
+    const seatMap = document.getElementById('seatMap');
+    seatMap.innerHTML = `<p style="color:var(--text-muted);font-size:13px;">Loading seat map…</p>`;
+    try {
+      const result = await api.getTakenSeats(movie._id, selectedDate, selectedTime);
+      takenSeats = new Set(result.taken);
+    } catch (err) {
+      takenSeats = new Set();
+    }
+    drawSeatMap();
+  }
+
+  function drawSeatMap() {
+    const seatMap = document.getElementById('seatMap');
+    seatMap.innerHTML = SEAT_ROWS.map((row) => {
+      let seats = '';
+      for (let col = 0; col < SEATS_PER_ROW; col++) {
+        const label = seatLabel(row, col);
+        const isTaken = takenSeats.has(label);
+        seats += `<button type="button" class="seat${isTaken ? ' is-taken' : ''}" data-seat="${label}" ${isTaken ? 'disabled' : ''} aria-label="Seat ${label}"></button>`;
+      }
+      return `<div class="seat-row"><span class="seat-row__label">${row}</span>${seats}</div>`;
+    }).join('');
+    updateSummary();
+  }
+
+  function handleSeatClick(e) {
+    const btn = e.target.closest('.seat');
+    if (!btn || btn.disabled) return;
+    const label = btn.dataset.seat;
+    if (selectedSeats.includes(label)) {
+      selectedSeats = selectedSeats.filter((s) => s !== label);
+      btn.classList.remove('is-selected');
+    } else {
+      selectedSeats.push(label);
+      btn.classList.add('is-selected');
+    }
+    updateSummary();
+  }
+
+  function updateSummary() {
+    document.querySelector('.booking-summary span').textContent = `${selectedSeats.length} seat(s) selected`;
+    document.getElementById('totalSeatsLabel').textContent = selectedSeats.length
+      ? [...selectedSeats].sort().join(', ')
+      : '—';
+    const btn = document.getElementById('confirmBtn');
+    btn.disabled = selectedSeats.length === 0;
+    btn.textContent = selectedSeats.length ? 'Confirm booking' : 'Select at least one seat';
+  }
+
+  async function handleConfirm() {
+    const name = document.getElementById('custName').value.trim();
+    const contact = document.getElementById('custEmail').value.trim();
+    const errorEl = document.getElementById('formError');
+    const btn = document.getElementById('confirmBtn');
+
+    if (!name || !contact) {
+      errorEl.textContent = 'Please enter your name and contact details.';
+      errorEl.classList.add('is-visible');
+      return;
+    }
+
+    errorEl.classList.remove('is-visible');
+    btn.disabled = true;
+    btn.textContent = 'Booking…';
+
+    try {
+      const booking = await api.createBooking({
+        movieId: movie._id,
+        date: selectedDate,
+        time: selectedTime,
+        seats: [...selectedSeats].sort(),
+        name,
+        contact,
+      });
+      renderConfirmation(booking);
+    } catch (err) {
+      errorEl.textContent = err.status === 409
+        ? err.message
+        : 'Something went wrong creating your booking. Please try again.';
+      errorEl.classList.add('is-visible');
+      if (err.status === 409) {
+        selectedSeats = [];
+        await loadSeatMap();
+      }
+      btn.disabled = false;
+      updateSummary();
+    }
+  }
+
+  function renderConfirmation(booking) {
+    app.innerHTML = `
+      <div class="ticket">
+        <div class="ticket__main">
+          <p class="ticket__ok">✓ Booking confirmed</p>
+          <h1 class="ticket__movie">${booking.movieTitle}</h1>
+          <div class="ticket__grid">
+            <div><p class="ticket__field-label">DATE</p><p class="ticket__field-value">${formatDateLabel(booking.date)}</p></div>
+            <div><p class="ticket__field-label">TIME</p><p class="ticket__field-value">${booking.time}</p></div>
+            <div><p class="ticket__field-label">SEATS</p><p class="ticket__field-value">${booking.seats.join(', ')}</p></div>
+            <div><p class="ticket__field-label">BOOKED FOR</p><p class="ticket__field-value">${booking.name}</p></div>
+          </div>
+        </div>
+        <div class="ticket__stub">
+          <p class="ticket__id-label">BOOKING ID</p>
+          <p class="ticket__id">${booking.bookingId}</p>
+        </div>
+      </div>
+      <a class="back-link" href="index.html">← Book another movie</a>
+    `;
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+
+# Environment variables — never commit real credentials or secrets
+.env
+
+# Logs
+npm-debug.log*
+*.log
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+
+# Editor folders
+.vscode/
+.idea/
+
+# Test coverage output (if you ever run jest --coverage)
+coverage/

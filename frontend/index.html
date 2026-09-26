@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reel &amp; Row — Now Showing</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar__mark">REEL <span>&amp; ROW</span></div>
+  <nav class="topbar__nav">
+    <a href="index.html">Now showing</a>
+    <a href="bookings.html">Admin</a>
+  </nav>
+</header>
+
+<main class="page">
+  <section class="hero">
+    <h1>What are we watching tonight?</h1>
+    <p>Pick a film, choose your showtime, and grab your seats — no account needed.</p>
+  </section>
+
+  <div class="movie-grid" id="movieGrid">
+    <p style="color:var(--text-muted);">Loading movies…</p>
+  </div>
+</main>
+
+<script src="script.js"></script>
+<script>
+  async function render() {
+    const grid = document.getElementById('movieGrid');
+    let movies;
+    try {
+      movies = await api.getMovies();
+    } catch (err) {
+      grid.innerHTML = `<div class="empty-state">Couldn't reach the server. Is the backend running?</div>`;
+      return;
+    }
+
+    if (movies.length === 0) {
+      grid.innerHTML = `<div class="empty-state">No movies are showing right now. Check back soon.</div>`;
+      return;
+    }
+
+    grid.innerHTML = movies.map(movie => `
+      <article class="movie-card">
+        <div class="movie-card__poster" style="${posterVars(movie.hue)}">
+          <div class="movie-card__sprockets"></div>
+          <div class="movie-card__sprockets movie-card__sprockets--bottom"></div>
+          <span class="movie-card__runtime">${movie.duration} min</span>
+        </div>
+        <div class="movie-card__body">
+          <h2 class="movie-card__title">${movie.title}</h2>
+          <p class="movie-card__meta">${movie.genre} · ${movie.rating}</p>
+          <button class="movie-card__cta" onclick="location.href='booking.html?movie=${movie._id}'">Book now</button>
+        </div>
+      </article>
+    `).join('');
+  }
+
+  render();
+</script>
+</body>
+</html>
