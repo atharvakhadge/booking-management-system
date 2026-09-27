@@ -37,6 +37,13 @@ booking-management-system/
 ├── Dockerfile            Builds the backend + serves the frontend as static files
 ├── docker-compose.yml    Runs the app together with its own MongoDB container
 ├── .dockerignore
+├── ansible/
+│   ├── inventory         Points at your EC2 instance
+│   ├── ansible.cfg
+│   └── deploy.yml        Installs Docker, pulls latest code, restarts containers
+├── monitoring/
+│   ├── docker-compose.monitoring.yml   Prometheus + Grafana + node-exporter + cAdvisor
+│   └── prometheus.yml                  What Prometheus scrapes, and how often
 ├── Jenkinsfile
 └── README.md
 ```
@@ -124,6 +131,63 @@ The app is deployed to a real AWS EC2 instance (Ubuntu, `t3.micro`, free tier, `
 
 This manual process is exactly what Phase 8 (Ansible) automates — instead of SSHing in and typing these commands by hand, an Ansible playbook does steps 2–4 on its own.
 
+## Automated redeployment with Ansible
+
+`ansible/deploy.yml` reproduces the manual deployment above: it installs Docker if it's missing, pulls the latest code from GitHub, and runs `docker compose up --build -d`. Run it any time you want to push a new version of the app to the server — no manual SSH steps needed.
+
+Ansible's control machine (the one you run `ansible-playbook` from) needs to be Linux/macOS — it doesn't run natively on Windows. The easiest fix, since Docker Desktop already enabled WSL2 on this machine back in Phase 6, is to use that:
+
+1. Open a WSL terminal (search "Ubuntu" or "WSL" in the Start menu — if nothing shows up, run `wsl --install -d Ubuntu` from PowerShell first, then restart).
+2. Install Ansible inside WSL:
+   ```bash
+   sudo apt update
+   sudo apt install -y ansible
+   ```
+3. Navigate to the `ansible/` folder. Since WSL can see your Windows files under `/mnt/c/...`, if your project is at `C:\Users\DELL\Desktop\booking-management-system`, that's:
+   ```bash
+   cd /mnt/c/Users/DELL/Desktop/booking-management-system/ansible
+   ```
+4. Open `inventory` and update the `ansible_ssh_private_key_file` path to wherever your `booking-key.pem` actually lives, using the same `/mnt/c/...` style path.
+5. Run the playbook:
+   ```bash
+   ansible-playbook deploy.yml
+   ```
+
+Ansible reports each task as `ok` (nothing needed changing), `changed` (it did something), or `failed`. Re-running it any time after this is safe — most tasks are written to skip work that's already done (that's what "idempotent" means in DevOps terms, worth knowing for your viva), so a re-run mostly just confirms Docker's still installed and pulls whatever's new since the last deploy.
+
+## Monitoring (Prometheus + Grafana)
+
+`monitoring/` runs a separate stack of four containers alongside the app, giving visibility into both the EC2 host and the app's own containers:
+
+- **Prometheus** — polls metrics every 15 seconds and stores them
+- **node-exporter** — exposes the EC2 instance's own CPU, memory, disk, and network stats
+- **cAdvisor** — exposes per-container stats for everything Docker is running on the host, including `booking-app` and `booking-mongo`
+- **Grafana** — the dashboard on top of Prometheus's data
+
+### Running it (on the EC2 instance)
+
+SSH into the server, then from inside `booking-management-system` (pull the latest code first if `monitoring/` isn't there yet — `git pull`):
+
+```bash
+cd monitoring
+docker compose -f docker-compose.monitoring.yml up -d
+```
+
+This is a **separate compose stack** from the main app on purpose — it can be stopped, restarted, or torn down independently without touching `booking-app` or `booking-mongo`.
+
+### Opening the AWS security group for this
+
+Same place as before (EC2 → Security Groups → your instance's group → Inbound rules → Edit), add two more Custom TCP rules, Source: Anywhere:
+- Port **3000** (Grafana)
+- Port **9090** (Prometheus, optional — lets you view raw scrape targets at `/targets`)
+
+### Setting up the Grafana dashboard
+
+1. Open `http://<your-ec2-ip>:3000` and log in with `admin` / `admin123` (from `docker-compose.monitoring.yml` — change these before running this anywhere but your own machine). It'll prompt you to set a new password on first login; you can skip that for this assignment.
+2. Add Prometheus as a data source: **Connections → Data sources → Add data source → Prometheus**. Set the URL to `http://prometheus:9090` (Grafana reaches Prometheus by its container name, since they're on the same Docker network — not `localhost`, that would point at Grafana's own container). Click **Save & test** — it should confirm it can reach Prometheus.
+3. Import a ready-made dashboard instead of building one from scratch: **Dashboards → New → Import**, enter dashboard ID **`1860`** ("Node Exporter Full" — a very widely used community dashboard), select your Prometheus data source, click **Import**. You'll immediately get CPU, memory, disk, and network graphs for the EC2 instance.
+4. Optionally repeat with dashboard ID **`19908`** for a similar pre-built cAdvisor/container dashboard.
+
 ## Jenkins and Docker together
 
 The `Jenkinsfile` now has a `Build Docker Image` stage after the tests pass, so a green pipeline ends with a `booking-management-system` image sitting in Docker's local image cache on whatever machine runs the build.
@@ -139,6 +203,6 @@ One thing worth knowing if you're running Jenkins natively on Windows (as instal
 - ✅ Phase 5 — Jenkins pipeline
 - ✅ Phase 6 — Docker
 - ✅ Phase 7 — Deployment
-- ⬜ Phase 8 — Ansible automation
-- ⬜ Phase 9 — Monitoring
+- ✅ Phase 8 — Ansible automation
+- ⬜ Phase 9 — Monitoring (in progress — see below)
 - ⬜ Phase 10 — Final report + methodology diagram + viva prep

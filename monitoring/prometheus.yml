@@ -1,0 +1,20 @@
+global:
+  scrape_interval: 15s     # how often Prometheus polls each target
+  evaluation_interval: 15s
+
+scrape_configs:
+  # Prometheus monitoring itself — useful sanity check that it's alive
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Server-level metrics: CPU, memory, disk, network on the EC2 instance
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+
+  # Per-container metrics: CPU/memory/network for every Docker container
+  # on the host, including booking-app and booking-mongo
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
