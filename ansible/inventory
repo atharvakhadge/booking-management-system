@@ -1,0 +1,15 @@
+
+# Ansible inventory for the Booking Management System's deployment target.
+#
+# Replace the IP below if your EC2 instance's public IP ever changes (e.g.
+# after a stop/start — it only stays fixed if you attach an Elastic IP).
+#
+# ansible_ssh_private_key_file must point to your booking-key.pem.
+# If you're running Ansible from WSL (recommended on Windows), Windows
+# drives are mounted under /mnt/, so a key saved at
+# C:\Users\DELL\aws-keys\booking-key.pem is reachable from WSL at:
+#   /mnt/c/Users/DELL/aws-keys/booking-key.pem
+# Update the path below to match where yours actually lives.
+
+[booking_servers]
+13.203.205.4 ansible_user=ubuntu ansible_ssh_private_key_file=/home/atharvakhadge/.ssh/aws-keys/booking-key.pem ansible_python_interpreter=/usr/bin/python3

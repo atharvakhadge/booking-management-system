@@ -1,0 +1,87 @@
+---
+- name: Deploy Booking Management System to EC2
+  hosts: booking_servers
+  become: true
+
+  tasks:
+    - name: Check whether Docker is already installed
+      command: docker --version
+      register: docker_check
+      ignore_errors: true
+      changed_when: false
+
+    - name: Download Docker's official install script
+      get_url:
+        url: https://get.docker.com
+        dest: /tmp/get-docker.sh
+        mode: '0755'
+      when: docker_check.rc != 0
+
+    - name: Run Docker's install script
+      command: sh /tmp/get-docker.sh
+      when: docker_check.rc != 0
+
+    - name: Add the deploy user to the docker group
+      user:
+        name: "{{ ansible_user }}"
+        groups: docker
+        append: true
+
+    - name: Make sure the Docker service is enabled and running
+      systemd:
+        name: docker
+        enabled: true
+        state: started
+
+    - name: Install git
+      apt:
+        name: git
+        state: present
+        update_cache: true
+
+    - name: Check whether a swap file already exists
+      stat:
+        path: /swapfile
+      register: swap_file
+
+    - name: Create a 2GB swap file (t3.micro only has 1GB RAM)
+      command: fallocate -l 2G /swapfile
+      when: not swap_file.stat.exists
+
+    - name: Lock down swap file permissions
+      file:
+        path: /swapfile
+        mode: '0600'
+      when: not swap_file.stat.exists
+
+    - name: Format the swap file
+      command: mkswap /swapfile
+      when: not swap_file.stat.exists
+
+    - name: Enable the swap file
+      command: swapon /swapfile
+      when: not swap_file.stat.exists
+
+    - name: Make the swap file persist across reboots
+      lineinfile:
+        path: /etc/fstab
+        line: '/swapfile none swap sw 0 0'
+        state: present
+
+    - name: Clone or update the application repository
+      become: false
+      git:
+        repo: https://github.com/atharvakhadge/booking-management-system.git
+        dest: "/home/{{ ansible_user }}/booking-management-system"
+        version: main
+        force: true
+      register: repo_state
+
+    - name: Build and (re)start the app containers
+      command: docker compose up --build -d
+      args:
+        chdir: "/home/{{ ansible_user }}/booking-management-system"
+
+    - name: Show whether new code was actually pulled this run
+      debug:
+        msg: "Repository changed: {{ repo_state.changed }}"

@@ -175,6 +175,10 @@ docker compose -f docker-compose.monitoring.yml up -d
 
 This is a **separate compose stack** from the main app on purpose — it can be stopped, restarted, or torn down independently without touching `booking-app` or `booking-mongo`.
 
+### A real memory constraint worth knowing about
+
+`t3.micro` only has 1 GB of RAM. Running the app, MongoDB, and all four monitoring containers together on that pushes the instance right to its limit — during setup, this actually caused the whole instance to become briefly unresponsive (SSH included) until a swap file was added, giving Linux somewhere to overflow to instead of failing outright. `ansible/deploy.yml` now creates a 2GB swap file automatically (idempotently — it checks first and skips this if one already exists), so a fresh deployment via Ansible sets this up without needing the manual `fallocate`/`mkswap`/`swapon` steps. This is a genuine, demonstrable resource-constraint tradeoff worth mentioning in a viva: monitoring itself is what surfaced the problem (via the Node Exporter dashboard's swap/memory graphs), and the fix (swap, not a bigger instance) is a legitimate real-world response to a tight budget rather than just throwing more hardware at it.
+
 ### Opening the AWS security group for this
 
 Same place as before (EC2 → Security Groups → your instance's group → Inbound rules → Edit), add two more Custom TCP rules, Source: Anywhere:
@@ -204,5 +208,5 @@ One thing worth knowing if you're running Jenkins natively on Windows (as instal
 - ✅ Phase 6 — Docker
 - ✅ Phase 7 — Deployment
 - ✅ Phase 8 — Ansible automation
-- ⬜ Phase 9 — Monitoring (in progress — see below)
+- ✅ Phase 9 — Monitoring
 - ⬜ Phase 10 — Final report + methodology diagram + viva prep
